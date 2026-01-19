@@ -164,7 +164,7 @@ function LoginPageContent() {
                 <h1 className="text-3xl font-bold">MediSummarizer</h1>
             </Link>
             <p className="text-balance text-muted-foreground">
-              Sign in or create an account as a <span className="font-bold text-primary">{role}</span>
+              Welcome User
             </p>
           </div>
            <Tabs defaultValue="sign-in" className="w-full">
