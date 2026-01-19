@@ -13,15 +13,14 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useAuth, useUser } from '@/firebase';
+import { useUser } from '@/firebase';
 
 export function UserNav() {
   const router = useRouter();
-  const auth = useAuth();
   const { user, loading } = useUser();
 
   const handleLogout = async () => {
-    await auth.signOut();
+    localStorage.removeItem('mockUser');
     router.push('/');
   };
 

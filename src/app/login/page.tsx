@@ -4,16 +4,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState, Suspense, useEffect } from 'react';
 
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithPopup,
-  User as FirebaseUser,
-} from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { useAuth, useFirestore } from '@/firebase';
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,8 +17,6 @@ import type { User, UserRole } from "@/lib/types";
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const auth = useAuth();
-  const firestore = useFirestore();
   const { toast } = useToast();
 
   const [email, setEmail] = useState('');
@@ -43,115 +31,63 @@ function LoginPageContent() {
     setSignUpRole(role);
   }, [role]);
 
-  const handleAuthError = (error: any) => {
+  const handleError = (title: string, description: string) => {
     setLoading(false);
     toast({
       variant: 'destructive',
-      title: 'Authentication Failed',
-      description: error.message || 'An unknown error occurred.',
+      title: title,
+      description: description,
     });
   };
-
-  const createOrUpdateUserInFirestore = async (firebaseUser: FirebaseUser, name?: string, newRole?: UserRole): Promise<User> => {
-    const userDocRef = doc(firestore, 'users', firebaseUser.uid);
-    const userDoc = await getDoc(userDocRef);
-
-    if (userDoc.exists()) {
-      // User exists, return profile
-      return { id: userDoc.id, uid: firebaseUser.uid, ...userDoc.data() } as User;
-    } else {
-      // New user, create profile
-      const newUserProfile: Omit<User, 'id'> = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email!,
-        name: name || firebaseUser.displayName || 'New User',
-        role: newRole || 'patient', // default role
-        avatarUrl: firebaseUser.photoURL || `https://picsum.photos/seed/${firebaseUser.uid}/100/100`,
-      };
-      await setDoc(userDocRef, newUserProfile);
-      return { ...newUserProfile, id: userDocRef.id } as User;
-    }
-  }
-
-
+  
   const handleSignIn = async (event: React.FormEvent) => {
     event.preventDefault();
     setLoading(true);
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const userDocRef = doc(firestore, 'users', userCredential.user.uid);
-      const userDoc = await getDoc(userDocRef);
 
-      if (userDoc.exists()) {
-        const userProfile = { id: userDoc.id, ...userDoc.data() } as User;
-        if (userProfile.role !== role) {
-            auth.signOut();
-            toast({
-                variant: 'destructive',
-                title: 'Role Mismatch',
-                description: `You are trying to log in as a ${role}, but this account is a ${userProfile.role}.`,
-            });
-            setLoading(false);
+    const storedUserRaw = localStorage.getItem('mock_user_' + email);
+    if (storedUserRaw) {
+        const storedUser = JSON.parse(storedUserRaw);
+        if (storedUser.password === password) {
+            if (storedUser.role === role) {
+                localStorage.setItem('mockUser', JSON.stringify({
+                    name: storedUser.name,
+                    email: storedUser.email,
+                    role: storedUser.role
+                }));
+                router.push('/dashboard');
+            } else {
+                handleError('Role Mismatch', `You are trying to log in as a ${role}, but this account is a ${storedUser.role}.`);
+            }
         } else {
-            setLoading(false);
-            router.push('/dashboard');
+            handleError('Authentication Failed', 'Incorrect password.');
         }
-      } else {
-          auth.signOut();
-          handleAuthError({ message: 'No account found with this email. Please sign up.' });
-      }
-    } catch (error) {
-      handleAuthError(error);
+    } else {
+        handleError('Authentication Failed', 'No account found with this email. Please sign up.');
     }
+    setLoading(false);
   };
 
   const handleSignUp = async (event: React.FormEvent) => {
     event.preventDefault();
     setLoading(true);
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await createOrUpdateUserInFirestore(userCredential.user, name, signUpRole);
-      setLoading(false);
-      router.push('/dashboard');
-    } catch (error: any) {
-       if (error.code === 'auth/email-already-in-use') {
-        handleAuthError({ message: 'An account with this email already exists. Please sign in.' });
-      } else {
-        handleAuthError(error);
-      }
-    }
-  };
 
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    try {
-        const provider = new GoogleAuthProvider();
-        const result = await signInWithPopup(auth, provider);
-        const userDocRef = doc(firestore, 'users', result.user.uid);
-        const userDoc = await getDoc(userDocRef);
-
-        if (userDoc.exists()) {
-            const userProfile = { id: userDoc.id, ...userDoc.data() } as User;
-            if (userProfile.role !== role) {
-                auth.signOut();
-                toast({
-                    variant: 'destructive',
-                    title: 'Role Mismatch',
-                    description: `You are trying to log in as a ${role}, but this account is a ${userProfile.role}.`,
-                });
-                setLoading(false);
-            } else {
-                setLoading(false);
-                router.push('/dashboard');
-            }
-        } else {
-            await createOrUpdateUserInFirestore(result.user, result.user.displayName || 'New User', role);
-            setLoading(false);
-            router.push('/dashboard');
-        }
-    } catch (error) {
-        handleAuthError(error);
+    const storedUserRaw = localStorage.getItem('mock_user_' + email);
+    if (storedUserRaw) {
+        handleError('Sign-up Failed', 'An account with this email already exists. Please sign in.');
+        return;
     }
+
+    const newUser = { name, email, password, role: signUpRole };
+    localStorage.setItem('mock_user_' + email, JSON.stringify(newUser));
+    localStorage.setItem('mockUser', JSON.stringify({
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        avatarUrl: `https://picsum.photos/seed/${newUser.email}/100/100`
+    }));
+    
+    setLoading(false);
+    router.push('/dashboard');
   };
 
   return (
@@ -196,9 +132,6 @@ function LoginPageContent() {
                     </div>
                     <Button type="submit" className="w-full" disabled={loading}>
                       {loading ? 'Signing In...' : 'Sign In'}
-                    </Button>
-                    <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={loading} type="button">
-                      Sign in with Google
                     </Button>
                   </form>
                 </CardContent>

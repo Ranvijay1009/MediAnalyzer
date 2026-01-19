@@ -1,35 +1,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { useAuth, useFirestore } from '../provider';
-import { User as AppUser } from '@/lib/types';
+import { User } from '@/lib/types';
 
 export function useUser() {
-  const auth = useAuth();
-  const firestore = useFirestore();
-  const [user, setUser] = useState<AppUser | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      if (firebaseUser) {
-        const userDocRef = doc(firestore, 'users', firebaseUser.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          setUser({ id: userDoc.id, uid: firebaseUser.uid, ...userDoc.data() } as AppUser);
-        } else {
-            setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [auth, firestore]);
+    const storedUser = localStorage.getItem('mockUser');
+    if (storedUser) {
+      const parsedUser = JSON.parse(storedUser);
+      setUser({
+        id: `mock-id-${parsedUser.email}`,
+        uid: `mock-uid-${parsedUser.email}`,
+        name: parsedUser.name,
+        email: parsedUser.email,
+        role: parsedUser.role,
+        avatarUrl: parsedUser.avatarUrl || `https://picsum.photos/seed/${parsedUser.email}/100/100`,
+      });
+    }
+    setLoading(false);
+  }, []);
 
   return { user, loading };
 }

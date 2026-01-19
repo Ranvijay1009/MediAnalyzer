@@ -1,12 +1,7 @@
+'use client';
 import type { Metadata } from 'next';
 import { Toaster } from "@/components/ui/toaster"
-import { FirebaseClientProvider } from '@/firebase';
 import './globals.css';
-
-export const metadata: Metadata = {
-  title: 'MediSummarizer',
-  description: 'AI Healthcare Appointment & Report System',
-};
 
 export default function RootLayout({
   children,
@@ -21,9 +16,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@400;500;700&family=Belleza&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        <FirebaseClientProvider>
           {children}
-        </FirebaseClientProvider>
         <Toaster />
       </body>
     </html>
