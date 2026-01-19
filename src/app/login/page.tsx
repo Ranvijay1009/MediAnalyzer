@@ -2,7 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import React, { useState, Suspense } from 'react';
+import React, { useState, Suspense, useEffect } from 'react';
 
 import { 
   createUserWithEmailAndPassword, 
@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Logo } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 import type { User, UserRole } from "@/lib/types";
@@ -36,23 +37,11 @@ function LoginPageContent() {
   const [loading, setLoading] = useState(false);
 
   const role = (searchParams.get('role') as UserRole) || 'patient';
+  const [signUpRole, setSignUpRole] = useState<UserRole>(role);
 
-  const handleAuthSuccess = (firebaseUser: FirebaseUser, userProfile: User) => {
-    // Check if role matches
-    if (userProfile.role !== role) {
-      auth.signOut();
-      toast({
-        variant: 'destructive',
-        title: 'Role Mismatch',
-        description: `This account is registered as a ${userProfile.role}. Please log in with a ${role} account.`,
-      });
-      router.push(`/?role=${role}`);
-      return;
-    }
-
-    setLoading(false);
-    router.push(`/dashboard?role=${role}`);
-  };
+  useEffect(() => {
+    setSignUpRole(role);
+  }, [role]);
 
   const handleAuthError = (error: any) => {
     setLoading(false);
@@ -90,8 +79,27 @@ function LoginPageContent() {
     setLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const userProfile = await createOrUpdateUserInFirestore(userCredential.user);
-      handleAuthSuccess(userCredential.user, userProfile);
+      const userDocRef = doc(firestore, 'users', userCredential.user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        const userProfile = { id: userDoc.id, ...userDoc.data() } as User;
+        if (userProfile.role !== role) {
+            auth.signOut();
+            toast({
+                variant: 'destructive',
+                title: 'Role Mismatch',
+                description: `You are trying to log in as a ${role}, but this account is a ${userProfile.role}.`,
+            });
+            setLoading(false);
+        } else {
+            setLoading(false);
+            router.push('/dashboard');
+        }
+      } else {
+          auth.signOut();
+          handleAuthError({ message: 'No account found with this email. Please sign up.' });
+      }
     } catch (error) {
       handleAuthError(error);
     }
@@ -102,22 +110,47 @@ function LoginPageContent() {
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const userProfile = await createOrUpdateUserInFirestore(userCredential.user, name, role);
-      handleAuthSuccess(userCredential.user, userProfile);
-    } catch (error) {
-      handleAuthError(error);
+      await createOrUpdateUserInFirestore(userCredential.user, name, signUpRole);
+      setLoading(false);
+      router.push('/dashboard');
+    } catch (error: any) {
+       if (error.code === 'auth/email-already-in-use') {
+        handleAuthError({ message: 'An account with this email already exists. Please sign in.' });
+      } else {
+        handleAuthError(error);
+      }
     }
   };
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const userProfile = await createOrUpdateUserInFirestore(result.user, undefined, role);
-      handleAuthSuccess(result.user, userProfile);
+        const provider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, provider);
+        const userDocRef = doc(firestore, 'users', result.user.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (userDoc.exists()) {
+            const userProfile = { id: userDoc.id, ...userDoc.data() } as User;
+            if (userProfile.role !== role) {
+                auth.signOut();
+                toast({
+                    variant: 'destructive',
+                    title: 'Role Mismatch',
+                    description: `You are trying to log in as a ${role}, but this account is a ${userProfile.role}.`,
+                });
+                setLoading(false);
+            } else {
+                setLoading(false);
+                router.push('/dashboard');
+            }
+        } else {
+            await createOrUpdateUserInFirestore(result.user, result.user.displayName || 'New User', role);
+            setLoading(false);
+            router.push('/dashboard');
+        }
     } catch (error) {
-      handleAuthError(error);
+        handleAuthError(error);
     }
   };
 
@@ -131,7 +164,7 @@ function LoginPageContent() {
                 <h1 className="text-3xl font-bold">MediSummarizer</h1>
             </Link>
             <p className="text-balance text-muted-foreground">
-              Sign in as a <span className="font-bold text-primary">{role}</span>
+              Sign in or create an account as a <span className="font-bold text-primary">{role}</span>
             </p>
           </div>
            <Tabs defaultValue="sign-in" className="w-full">
@@ -194,6 +227,23 @@ function LoginPageContent() {
                     <div className="grid gap-2">
                       <Label htmlFor="password-signup">Password</Label>
                       <Input id="password-signup" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading}/>
+                    </div>
+                     <div className="grid gap-2">
+                        <Label>Role</Label>
+                        <RadioGroup value={signUpRole} onValueChange={(value) => setSignUpRole(value as UserRole)} className="flex gap-4 pt-1">
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="patient" id="r1" />
+                                <Label htmlFor="r1">Patient</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="doctor" id="r2" />
+                                <Label htmlFor="r2">Doctor</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="admin" id="r3" />
+                                <Label htmlFor="r3">Admin</Label>
+                            </div>
+                        </RadioGroup>
                     </div>
                     <Button type="submit" className="w-full" disabled={loading}>
                       {loading ? 'Creating Account...' : 'Create account'}
