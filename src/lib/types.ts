@@ -1,7 +1,8 @@
 export type UserRole = 'patient' | 'doctor' | 'admin';
 
 export type User = {
-  id: string;
+  id: string; // Firestore document ID
+  uid: string; // Firebase Auth UID
   name: string;
   email: string;
   role: UserRole;

@@ -1,5 +1,5 @@
 'use client';
-import { useSearchParams } from 'next/navigation';
+import { useUser } from '@/firebase';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { appointments } from "@/lib/data";
-import type { Appointment, UserRole } from "@/lib/types";
+import type { Appointment } from "@/lib/types";
 
 const statusColors: Record<Appointment['status'], string> = {
   upcoming: "bg-blue-100 text-blue-800 border-blue-200",
@@ -28,8 +28,13 @@ const statusColors: Record<Appointment['status'], string> = {
 };
 
 export default function AppointmentsPage() {
-  const searchParams = useSearchParams();
-  const role = (searchParams.get('role') as UserRole) || 'patient';
+  const { user, loading } = useUser();
+  
+  if (loading || !user) {
+    return <div>Loading...</div>;
+  }
+
+  const { role } = user;
   
   const pageTitle = role === 'patient' ? "My Appointments" : "Manage Appointments";
   const pageDescription = role === 'patient' 
@@ -37,7 +42,7 @@ export default function AppointmentsPage() {
     : "Review and manage appointment requests from patients.";
 
   const filteredAppointments = role === 'patient' 
-    ? appointments.filter(a => a.patient.id === 'user-patient-01')
+    ? appointments.filter(a => a.patient.id === 'user-patient-01') // This should be updated to use the logged in user's ID
     : appointments;
 
   return (

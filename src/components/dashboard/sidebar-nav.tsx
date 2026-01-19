@@ -8,6 +8,7 @@ import {
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
 import type { UserRole } from '@/lib/types';
+import { useUser } from '@/firebase';
 import {
   Users,
   Calendar,
@@ -44,7 +45,13 @@ const navItems: Record<UserRole, { name: string; href: string; icon: React.Eleme
 export function SidebarNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const role = (searchParams.get('role') as UserRole) || 'patient';
+  const { user, loading } = useUser();
+
+  if (loading || !user) {
+    return null; // Or a skeleton loader
+  }
+
+  const { role } = user;
   const currentNav = navItems[role];
 
   const createQueryString = (name: string, value: string) => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,28 +12,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuPortal,
-  DropdownMenuSubContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem
 } from '@/components/ui/dropdown-menu';
-import type { User, UserRole } from '@/lib/types';
-import { users } from '@/lib/data';
+import { useAuth, useUser } from '@/firebase';
 
 export function UserNav() {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const role = (searchParams.get('role') as UserRole) || 'patient';
-  const user = users[role];
+  const auth = useAuth();
+  const { user, loading } = useUser();
 
-  const handleRoleChange = (newRole: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('role', newRole);
-    router.push(`${pathname}?${params.toString()}`);
+  const handleLogout = async () => {
+    await auth.signOut();
+    router.push('/');
   };
+
+  if (loading || !user) {
+      return (
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+            <Avatar className="h-9 w-9" />
+        </Button>
+      );
+  }
 
   return (
     <DropdownMenu>
@@ -66,20 +64,7 @@ export function UserNav() {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>Switch Role</DropdownMenuSubTrigger>
-          <DropdownMenuPortal>
-            <DropdownMenuSubContent>
-              <DropdownMenuRadioGroup value={role} onValueChange={handleRoleChange}>
-                <DropdownMenuRadioItem value="patient">Patient</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="doctor">Doctor</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="admin">Admin</DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuSubContent>
-          </DropdownMenuPortal>
-        </DropdownMenuSub>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push('/login')}>
+        <DropdownMenuItem onClick={handleLogout}>
           Log out
           <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
         </DropdownMenuItem>

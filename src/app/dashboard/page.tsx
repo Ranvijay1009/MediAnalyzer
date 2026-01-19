@@ -1,14 +1,11 @@
 'use client';
-import { useSearchParams } from 'next/navigation';
 import type { UserRole } from '@/lib/types';
-import { users } from '@/lib/data';
+import { useUser } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Activity, Calendar, Users, FileText } from 'lucide-react';
 
 export default function DashboardPage() {
-    const searchParams = useSearchParams();
-    const role = (searchParams.get('role') as UserRole) || 'patient';
-    const user = users[role];
+    const { user, loading } = useUser();
 
     const getGreeting = () => {
         const hour = new Date().getHours();
@@ -16,6 +13,12 @@ export default function DashboardPage() {
         if (hour < 18) return "Good Afternoon";
         return "Good Evening";
     }
+
+    if (loading || !user) {
+        return <div>Loading...</div>
+    }
+    
+    const role = user.role;
 
     const patientCards = [
         { title: 'Upcoming Appointments', value: '2', icon: Calendar, description: 'Check your schedule' },
